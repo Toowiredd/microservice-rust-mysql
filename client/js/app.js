@@ -1,135 +1,131 @@
+/**
+ * @file This script handles the frontend logic for the Development Event Tracker.
+ * It communicates with the backend API to fetch and display development events
+ * in a chronological timeline, and supports filtering of those events.
+ */
+
 (function() {
-  let orders = null;
+  // --- CONFIGURATION ---
+  const config = {
+    API_BASE_URL: "http://localhost:8080",
+  };
+
+  // --- DOM ELEMENT REFERENCES ---
   const appLoadingEle = document.getElementById("app-loading-display");
-  const orderWrapperEle = document.getElementById("order-display");
-  const orderEmptyTextEle = document.getElementById("order-empty-text");
-  const orderTableEle = document.getElementById("order-table");
-  const orderTableBodyEle = document.querySelector("#order-table tbody");
-  const addOrderEle = document.getElementById("add-order-wrapper");
-  const addOrderForm = document.getElementById("add-order-form");
+  const timelineContainerEle = document.getElementById("timeline-container");
+  const filterFormEle = document.getElementById("filter-form");
+  const sourceFilterEle = document.getElementById("source-filter");
+  const eventTypeFilterEle = document.getElementById("event-type-filter");
 
-  const orderIdField = document.getElementById("order-id");
-  const productIdField = document.getElementById("product-id");
-  const quantityField = document.getElementById("quantity");
-  const amountField = document.getElementById("amount");
-  const taxField = document.getElementById("tax");
-  const shippingField = document.getElementById("shippingAmount");
-  const shippingAddressField = document.getElementById("shippingAddress");
+  /**
+   * Fetches the list of events from the backend API and triggers rendering.
+   * @param {Object} filters - An object containing filter parameters.
+   * @param {string} [filters.source] - The source to filter by.
+   * @param {string} [filters.eventType] - The event type to filter by.
+   */
+  function fetchEvents(filters = {}) {
+    const { source, eventType } = filters;
+    const queryParams = new URLSearchParams();
+    if (source) {
+      queryParams.append("source", source);
+    }
+    if (eventType) {
+      queryParams.append("event_type", eventType);
+    }
 
-  function fetchOrders() {
-    fetch("http://localhost:8080/orders")
-      .then(r => r.json())
-      .then(r => orders = r)
-      .then(renderOrders)
+    const queryString = queryParams.toString();
+    const fetchUrl = `${config.API_BASE_URL}/events${queryString ? `?${queryString}` : ''}`;
+
+    // Show loading indicator before fetching
+    appLoadingEle.classList.remove("d-none");
+    timelineContainerEle.classList.add("d-none");
+
+    fetch(fetchUrl)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(events => renderTimeline(events))
       .catch((e) => {
-        init();
+        console.error("Failed to fetch events.", e);
+        displayError(e);
       });
   }
 
-  function init() {
-    fetch("http://localhost:8080/init")
-      .then(() => fetchOrders())
-      .catch((e) => displayError(e));
-  }
-
-  function renderOrders() {
+  /**
+   * Renders the fetched events into a timeline format.
+   * @param {Array<Object>} events - An array of event objects from the backend.
+   */
+  function renderTimeline(events) {
     appLoadingEle.classList.add("d-none");
-    orderWrapperEle.classList.remove("d-none");
-    addOrderEle.classList.remove("d-none");
+    timelineContainerEle.classList.remove("d-none");
 
-    if (orders.length === 0) {
-      orderEmptyTextEle.classList.remove("d-none");
-      orderTableEle.classList.add("d-none");
+    // Clear any existing content
+    while (timelineContainerEle.firstChild) {
+      timelineContainerEle.removeChild(timelineContainerEle.firstChild);
+    }
+
+    if (!events || events.length === 0) {
+      const emptyState = document.createElement("div");
+      emptyState.className = "alert alert-info";
+      emptyState.textContent = "No development events match the current filters.";
+      timelineContainerEle.appendChild(emptyState);
       return;
     }
 
-    orderEmptyTextEle.classList.add("d-none");
-    orderTableEle.classList.remove("d-none");
+    // Create and append a card for each event.
+    events.forEach(event => {
+      const card = document.createElement("div");
+      card.className = "card mb-3";
 
-    while (orderTableBodyEle.firstChild) {
-      orderTableBodyEle.removeChild(orderTableBodyEle.firstChild);
-    }
+      const cardBody = document.createElement("div");
+      cardBody.className = "card-body";
 
-    orders.forEach((order) => {
-      const orderId = order.order_id;
+      const title = document.createElement("h5");
+      title.className = "card-title";
+      title.textContent = `${event.source}: ${event.event_type}`;
 
-      const row = document.createElement("tr");
+      const subtitle = document.createElement("h6");
+      subtitle.className = "card-subtitle mb-2 text-muted";
+      subtitle.textContent = new Date(event.timestamp).toLocaleString();
 
-      row.appendChild(createCell(order.order_id));
-      row.appendChild(createCell(order.product_id));
-      row.appendChild(createCell(order.quantity));
-      row.appendChild(createCell(order.amount));
-      row.appendChild(createCell(order.shipping));
-      row.appendChild(createCell(order.tax));
-      row.appendChild(createCell(order.shipping_address));
+      const dataPre = document.createElement("pre");
+      dataPre.className = "bg-light p-2 rounded";
+      dataPre.textContent = JSON.stringify(event.data, null, 2);
 
-      const actionCell = document.createElement("td");
-
-      const deleteButton = document.createElement("button");
-      deleteButton.classList.add(...["btn","btn-sm","btn-danger"]);
-      deleteButton.innerText = "Delete";
-
-      deleteButton.addEventListener("click", (e) => {
-        e.preventDefault();
-        deleteOrder(orderId);
-      });
-
-      actionCell.appendChild(deleteButton);
-
-      row.appendChild(actionCell);
-
-      orderTableBodyEle.appendChild(row);
+      cardBody.appendChild(title);
+      cardBody.appendChild(subtitle);
+      cardBody.appendChild(dataPre);
+      card.appendChild(cardBody);
+      timelineContainerEle.appendChild(card);
     });
   }
 
-  function createCell(contents) {
-    const cell = document.createElement("td");
-    cell.innerText = contents;
-    return cell;
-  }
-
-  function deleteOrder(orderId) {
-    fetch(`http://localhost:8080/delete_order?id=${orderId}`)
-      .then(() => fetchOrders());
-  }
-
-  function displayError(err) {
-    alert("Error:" + err);
-  }
-
-  function onAddFormSubmit(e) {
+  /**
+   * Handles the submission of the filter form.
+   * @param {Event} e - The form submission event.
+   */
+  function handleFilterSubmit(e) {
     e.preventDefault();
-
-    const data = {
-      order_id : parseFloat(orderIdField.value),
-      product_id : parseFloat(productIdField.value),
-      quantity : parseFloat(quantityField.value),
-      amount : parseFloat(amountField.value),
-      shipping : parseFloat(shippingField.value),
-      tax : parseFloat(taxField.value),
-      shipping_address : shippingAddressField.value,
-    };
-
-    fetch("http://localhost:8080/create_order", {
-      method: "POST",
-      body: JSON.stringify(data),
-      headers: { "Content-type": "application/json" },
-    }).then(() => fetchOrders())
-      .then(() => resetAddOrderForm());
-
-    alert("Order added");
+    const source = sourceFilterEle.value.trim();
+    const eventType = eventTypeFilterEle.value.trim();
+    fetchEvents({ source, eventType });
   }
 
-  function resetAddOrderForm() {
-    orderIdField.value = "";
-    productIdField.value = "";
-    quantityField.value = "";
-    amountField.value = "";
-    shippingField.value = "";
-    taxField.value = "";
-    shippingAddressField.value = "";
+  /**
+   * Displays an error message to the user.
+   * @param {Error} err - The error object to display.
+   */
+  function displayError(err) {
+    appLoadingEle.classList.remove("d-none");
+    timelineContainerEle.classList.add("d-none");
+    appLoadingEle.innerHTML = `<div class="alert alert-danger"><strong>Error:</strong> Could not load events. Is the backend server running? <br><small>${err.message}</small></div>`;
   }
 
-  fetchOrders();
-  addOrderForm.addEventListener("submit", onAddFormSubmit);
+  // --- INITIALIZATION ---
+  filterFormEle.addEventListener("submit", handleFilterSubmit);
+  // Start the application by fetching all events.
+  fetchEvents();
 })();
