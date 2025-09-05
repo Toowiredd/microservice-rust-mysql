@@ -1,0 +1,38 @@
+[
+  {
+    "timestamp": "2025-09-05T10:00:00Z",
+    "source": "Shell",
+    "event_type": "CommandExecuted",
+    "data": {
+      "command": "ls -l",
+      "exit_code": 0
+    }
+  },
+  {
+    "timestamp": "2025-09-05T10:01:00Z",
+    "source": "ClaudeHook",
+    "event_type": "UserPromptSubmit",
+    "data": {
+      "prompt": "How do I test this feature?"
+    }
+  },
+  {
+    "timestamp": "2025-09-05T10:02:00Z",
+    "source": "Shell",
+    "event_type": "CommandExecuted",
+    "data": {
+      "command": "npm run test",
+      "exit_code": 1,
+      "error": "1 test failed"
+    }
+  },
+  {
+    "timestamp": "2025-09-05T10:03:00Z",
+    "source": "LogFile",
+    "event_type": "ErrorLog",
+    "data": {
+      "level": "error",
+      "message": "Failed to connect to database"
+    }
+  }
+]

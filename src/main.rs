@@ -162,6 +162,11 @@ async fn route_request(req: Request<Body>, pool: Pool) -> Result<Response<Body>,
                 params.push(("event_type", t.clone()));
             }
 
+            if let Some(q) = query_params_map.get("q").filter(|q| !q.is_empty()) {
+                where_clauses.push("CAST(data AS CHAR) LIKE :query");
+                params.push(("query", format!("%{}%", q)));
+            }
+
             if !where_clauses.is_empty() {
                 query.push_str(" WHERE ");
                 query.push_str(&where_clauses.join(" AND "));
