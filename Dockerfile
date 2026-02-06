@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM --platform=$BUILDPLATFORM rust:1.71 AS buildbase
+FROM --platform=$BUILDPLATFORM rust:1.82 AS buildbase
 WORKDIR /src
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
